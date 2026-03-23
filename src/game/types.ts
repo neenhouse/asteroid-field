@@ -55,7 +55,7 @@ export interface Star {
 
 // --- Power-ups ---
 
-export type PowerUpKind = 'shield' | 'rapidfire' | 'bomb';
+export type PowerUpKind = 'shield' | 'rapidfire' | 'bomb' | 'spread';
 
 export interface PowerUp {
   x: number; y: number;
@@ -64,7 +64,7 @@ export interface PowerUp {
   active: boolean;
 }
 
-export const POWERUP_DROP_CHANCE = 0.15;
+export const POWERUP_DROP_CHANCE = 0.25;
 export const POWERUP_LIFETIME = 8;
 export const POWERUP_RADIUS = 4;
 export const SHIELD_DURATION = 6;
@@ -74,6 +74,8 @@ export const RAPIDFIRE_COOLDOWN = 0.06;
 export const COL_SHIELD = '#44ff88';
 export const COL_RAPIDFIRE = '#ffff44';
 export const COL_BOMB = '#ff6644';
+export const COL_SPREAD = '#aa88ff';
+export const SPREAD_DURATION = 6;
 
 // --- Utility functions ---
 

@@ -3,9 +3,9 @@ import {
   SCALE, LASER_SPEED, LASER_LIFE, FIRE_COOLDOWN, START_LIVES,
   INVULN_TIME, HIT_RADIUS_SHIP, ASTEROID_TIERS, PARALLAX,
   COL_SHIP, COL_LASER_GLOW, COL_PARTICLE, COL_PARTICLE_BLUE,
-  COL_SHIELD, COL_RAPIDFIRE, COL_BOMB,
+  COL_SHIELD, COL_RAPIDFIRE, COL_BOMB, COL_SPREAD,
   POWERUP_DROP_CHANCE, POWERUP_LIFETIME, POWERUP_RADIUS,
-  SHIELD_DURATION, RAPIDFIRE_DURATION, RAPIDFIRE_COOLDOWN,
+  SHIELD_DURATION, RAPIDFIRE_DURATION, RAPIDFIRE_COOLDOWN, SPREAD_DURATION,
   lerp, clamp, wrap, dist, randRange,
 } from './types';
 import { InputManager } from './input';
@@ -83,6 +83,7 @@ export class GameEngine {
   // Power-up effects
   private shieldTimer = 0;
   private rapidfireTimer = 0;
+  private spreadTimer = 0;
 
   // Combo system
   private comboCount = 0;
@@ -175,6 +176,7 @@ export class GameEngine {
     this.shakeY = 0;
     this.shieldTimer = 0;
     this.rapidfireTimer = 0;
+    this.spreadTimer = 0;
     this.comboCount = 0;
     this.comboTimer = 0;
     this.comboDisplayTimer = 0;
@@ -242,7 +244,7 @@ export class GameEngine {
 
   private spawnPowerUp(x: number, y: number): void {
     if (Math.random() > POWERUP_DROP_CHANCE) return;
-    const kinds: PowerUpKind[] = ['shield', 'rapidfire', 'bomb'];
+    const kinds: PowerUpKind[] = ['shield', 'rapidfire', 'bomb', 'spread'];
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
     this.powerups.push({ x, y, kind, life: POWERUP_LIFETIME, active: true });
   }
@@ -251,12 +253,28 @@ export class GameEngine {
     if (this.fireCooldown > 0 || !this.shipAlive || this.gameOver) return;
     const tipX = this.shipX + Math.cos(this.shipAngle) * 4;
     const tipY = this.shipY + Math.sin(this.shipAngle) * 4;
-    this.lasers.push({
-      x: tipX, y: tipY,
-      vx: Math.cos(this.shipAngle) * LASER_SPEED,
-      vy: Math.sin(this.shipAngle) * LASER_SPEED,
-      life: LASER_LIFE, active: true,
-    });
+
+    // Spread: fire 3 lasers in a fan
+    if (this.spreadTimer > 0) {
+      const spreadAngles = [-0.25, 0, 0.25];
+      for (const offset of spreadAngles) {
+        const a = this.shipAngle + offset;
+        this.lasers.push({
+          x: tipX, y: tipY,
+          vx: Math.cos(a) * LASER_SPEED,
+          vy: Math.sin(a) * LASER_SPEED,
+          life: LASER_LIFE, active: true,
+        });
+      }
+    } else {
+      this.lasers.push({
+        x: tipX, y: tipY,
+        vx: Math.cos(this.shipAngle) * LASER_SPEED,
+        vy: Math.sin(this.shipAngle) * LASER_SPEED,
+        life: LASER_LIFE, active: true,
+      });
+    }
+
     const cooldown = this.rapidfireTimer > 0 ? RAPIDFIRE_COOLDOWN : FIRE_COOLDOWN;
     this.fireCooldown = cooldown;
     this.spawnParticles(tipX, tipY, 3, COL_LASER_GLOW, 20);
@@ -303,14 +321,19 @@ export class GameEngine {
   private activateBomb(): void {
     playBomb();
     this.shakeIntensity = Math.max(this.shakeIntensity, 6);
+    const BOMB_RADIUS = 60;
+    let destroyed = 0;
     for (const a of this.asteroids) {
       if (!a.active || a.layer !== 2) continue;
-      a.active = false;
-      this.score += ASTEROID_TIERS[a.tier].score;
-      this.spawnParticles(a.x, a.y, 4, COL_BOMB, 30);
+      if (dist(this.shipX, this.shipY, a.x, a.y) < BOMB_RADIUS) {
+        a.active = false;
+        this.score += ASTEROID_TIERS[a.tier].score;
+        this.spawnParticles(a.x, a.y, 4, COL_BOMB, 30);
+        destroyed++;
+      }
     }
-    // Flash effect
-    this.spawnParticles(this.shipX, this.shipY, 20, COL_BOMB, 60, 2);
+    // Visual blast radius ring + flash
+    this.spawnParticles(this.shipX, this.shipY, 12 + destroyed * 2, COL_BOMB, 50, 2);
   }
 
   private shipHit(): void {
@@ -398,20 +421,31 @@ export class GameEngine {
     if (this.difficultyTimer >= 15) {
       this.difficultyTimer -= 15;
       this.difficulty++;
-      this.spawnInterval = Math.max(2.5 - this.difficulty * 0.2, 0.8);
+      this.spawnInterval = Math.max(1.8 - this.difficulty * 0.15, 0.4);
       // Wave announcement
       this.waveAnnounceTimer = 2.5;
       this.waveAnnounceLevel = this.difficulty;
+      // Burst spawn on wave change — flood of asteroids
+      const burstCount = 2 + this.difficulty;
+      for (let i = 0; i < burstCount; i++) {
+        const tier = Math.random() < 0.3 + this.difficulty * 0.05 ? 0 : 1;
+        this.spawnAsteroid(tier, 2);
+      }
     }
 
-    // Periodic asteroid spawns
+    // Periodic asteroid spawns — bias toward near layer at higher difficulty
     this.spawnTimer += dt;
     if (this.spawnTimer >= this.spawnInterval) {
       this.spawnTimer -= this.spawnInterval;
-      const tier = Math.random() < 0.4 ? 0 : 1;
+      const tier = Math.random() < 0.3 + this.difficulty * 0.05 ? 0 : 1;
+      const nearBias = Math.min(0.5 + this.difficulty * 0.05, 0.8);
       const lr = Math.random();
-      const layer = lr < 0.2 ? 0 : lr < 0.45 ? 1 : 2;
+      const layer = lr < 0.1 ? 0 : lr < (1 - nearBias) ? 1 : 2;
       this.spawnAsteroid(tier, layer);
+      // Double spawn at higher difficulties
+      if (this.difficulty >= 3 && Math.random() < 0.3) {
+        this.spawnAsteroid(Math.random() < 0.5 ? 0 : 1, 2);
+      }
     }
 
     // Shooting
@@ -436,6 +470,7 @@ export class GameEngine {
     // Power-up timers
     if (this.shieldTimer > 0) this.shieldTimer -= dt;
     if (this.rapidfireTimer > 0) this.rapidfireTimer -= dt;
+    if (this.spreadTimer > 0) this.spreadTimer -= dt;
 
     // Combo decay
     if (this.comboTimer > 0) {
@@ -510,13 +545,15 @@ export class GameEngine {
         if (dist(this.shipX, this.shipY, pu.x, pu.y) < POWERUP_RADIUS + HIT_RADIUS_SHIP) {
           pu.active = false;
           playPickup();
-          this.spawnParticles(pu.x, pu.y, 6,
-            pu.kind === 'shield' ? COL_SHIELD : pu.kind === 'rapidfire' ? COL_RAPIDFIRE : COL_BOMB,
-            25);
+          const puColor = pu.kind === 'shield' ? COL_SHIELD
+            : pu.kind === 'rapidfire' ? COL_RAPIDFIRE
+            : pu.kind === 'spread' ? COL_SPREAD : COL_BOMB;
+          this.spawnParticles(pu.x, pu.y, 6, puColor, 25);
           switch (pu.kind) {
             case 'shield': this.shieldTimer = SHIELD_DURATION; break;
             case 'rapidfire': this.rapidfireTimer = RAPIDFIRE_DURATION; break;
             case 'bomb': this.activateBomb(); break;
+            case 'spread': this.spreadTimer = SPREAD_DURATION; break;
           }
         }
       }
@@ -590,7 +627,7 @@ export class GameEngine {
       this.score, this.lives, this.difficulty,
       this.totalTime,
     );
-    drawActivePowerUps(this.ctx, this.W, this.shieldTimer, this.rapidfireTimer);
+    drawActivePowerUps(this.ctx, this.W, this.shieldTimer, this.rapidfireTimer, this.spreadTimer);
     drawCombo(this.ctx, this.W, this.comboCount, this.comboDisplayTimer, this.lastComboScore);
 
     // Wave announcement

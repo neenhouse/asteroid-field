@@ -2,7 +2,7 @@ import type { Asteroid, Laser, Particle, Star, PowerUp, PowerUpKind } from './ty
 import type { LeaderboardEntry } from './leaderboard';
 import {
   COL_BG, COL_SHIP, COL_SHIP_ACCENT, COL_LASER, COL_LASER_GLOW,
-  COL_ASTEROID, COL_HUD, COL_STAR, COL_SHIELD, COL_RAPIDFIRE, COL_BOMB,
+  COL_ASTEROID, COL_HUD, COL_STAR, COL_SHIELD, COL_RAPIDFIRE, COL_BOMB, COL_SPREAD,
   ASTEROID_TIERS, PARALLAX, POWERUP_RADIUS,
   hexToRgba, clamp, wrap,
 } from './types';
@@ -93,7 +93,7 @@ export function drawParticles(ctx: CanvasRenderingContext2D, particles: Particle
 }
 
 function powerUpColor(kind: PowerUpKind): string {
-  return kind === 'shield' ? COL_SHIELD : kind === 'rapidfire' ? COL_RAPIDFIRE : COL_BOMB;
+  return kind === 'shield' ? COL_SHIELD : kind === 'rapidfire' ? COL_RAPIDFIRE : kind === 'spread' ? COL_SPREAD : COL_BOMB;
 }
 
 export function drawPowerUps(ctx: CanvasRenderingContext2D, powerups: PowerUp[], totalTime: number) {
@@ -120,7 +120,7 @@ export function drawPowerUps(ctx: CanvasRenderingContext2D, powerups: PowerUp[],
     ctx.font = '3px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    const label = pu.kind === 'shield' ? 'S' : pu.kind === 'rapidfire' ? 'F' : 'B';
+    const label = pu.kind === 'shield' ? 'S' : pu.kind === 'rapidfire' ? 'F' : pu.kind === 'spread' ? 'W' : 'B';
     ctx.fillText(label, pu.x, pu.y - r - 1);
   }
 }
@@ -177,19 +177,26 @@ export function drawWaveAnnounce(
 
 export function drawActivePowerUps(
   ctx: CanvasRenderingContext2D, W: number,
-  shieldTimer: number, rapidfireTimer: number,
+  shieldTimer: number, rapidfireTimer: number, spreadTimer: number,
 ) {
   const x = W - 4;
+  let y = 14;
   ctx.font = '5px monospace';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'top';
   if (shieldTimer > 0) {
     ctx.fillStyle = COL_SHIELD;
-    ctx.fillText(`SHIELD ${Math.ceil(shieldTimer)}s`, x, 14);
+    ctx.fillText(`SHIELD ${Math.ceil(shieldTimer)}s`, x, y);
+    y += 7;
   }
   if (rapidfireTimer > 0) {
     ctx.fillStyle = COL_RAPIDFIRE;
-    ctx.fillText(`RAPID ${Math.ceil(rapidfireTimer)}s`, x, shieldTimer > 0 ? 21 : 14);
+    ctx.fillText(`RAPID ${Math.ceil(rapidfireTimer)}s`, x, y);
+    y += 7;
+  }
+  if (spreadTimer > 0) {
+    ctx.fillStyle = COL_SPREAD;
+    ctx.fillText(`SPREAD ${Math.ceil(spreadTimer)}s`, x, y);
   }
 }
 
