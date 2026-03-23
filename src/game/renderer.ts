@@ -112,15 +112,17 @@ export function drawPowerUps(ctx: CanvasRenderingContext2D, powerups: PowerUp[],
     ctx.lineTo(pu.x - r, pu.y);
     ctx.closePath();
     ctx.stroke();
-    // Center dot
+    // Center icon
     ctx.fillStyle = hexToRgba(col, pulse);
     ctx.fillRect(Math.floor(pu.x), Math.floor(pu.y), 1, 1);
-    // Label
-    ctx.fillStyle = hexToRgba(col, 0.8);
-    ctx.font = '3px monospace';
+    // Label — full name above
+    ctx.fillStyle = hexToRgba(col, 0.9);
+    ctx.font = '4px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    const label = pu.kind === 'shield' ? 'S' : pu.kind === 'rapidfire' ? 'F' : pu.kind === 'spread' ? 'W' : 'B';
+    const label = pu.kind === 'shield' ? 'SHIELD'
+      : pu.kind === 'rapidfire' ? 'RAPID'
+      : pu.kind === 'spread' ? 'SPREAD' : 'BOMB';
     ctx.fillText(label, pu.x, pu.y - r - 1);
   }
 }

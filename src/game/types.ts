@@ -1,6 +1,6 @@
 // --- Constants (matching retro-pixel original) ---
 
-export const SCALE = 4;
+export const SCALE = 3;
 export const LASER_SPEED = 200;
 export const LASER_LIFE = 1.2;
 export const FIRE_COOLDOWN = 0.15;
@@ -64,7 +64,7 @@ export interface PowerUp {
   active: boolean;
 }
 
-export const POWERUP_DROP_CHANCE = 0.25;
+export const POWERUP_DROP_CHANCE = 0.12;
 export const POWERUP_LIFETIME = 8;
 export const POWERUP_RADIUS = 4;
 export const SHIELD_DURATION = 6;
