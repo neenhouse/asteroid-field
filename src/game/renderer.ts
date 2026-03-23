@@ -115,15 +115,19 @@ export function drawPowerUps(ctx: CanvasRenderingContext2D, powerups: PowerUp[],
     // Center icon
     ctx.fillStyle = hexToRgba(col, pulse);
     ctx.fillRect(Math.floor(pu.x), Math.floor(pu.y), 1, 1);
-    // Label — full name above
-    ctx.fillStyle = hexToRgba(col, 0.9);
-    ctx.font = '4px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
+    // Label — full name above with dark backing
     const label = pu.kind === 'shield' ? 'SHIELD'
       : pu.kind === 'rapidfire' ? 'RAPID'
       : pu.kind === 'spread' ? 'SPREAD' : 'BOMB';
-    ctx.fillText(label, pu.x, pu.y - r - 1);
+    ctx.font = '6px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    const labelY = pu.y - r - 2;
+    const labelW = label.length * 4 + 4;
+    ctx.fillStyle = hexToRgba('#000000', 0.6);
+    ctx.fillRect(Math.floor(pu.x - labelW / 2), Math.floor(labelY - 6), labelW, 8);
+    ctx.fillStyle = col;
+    ctx.fillText(label, pu.x, labelY);
   }
 }
 
