@@ -50,6 +50,7 @@ export interface Particle {
 export interface Star {
   x: number; y: number; brightness: number;
   twinklePhase: number; twinkleSpeed: number; layer: number;
+  dx: number; dy: number;
 }
 
 // --- Power-ups ---

@@ -20,6 +20,9 @@ export function drawStars(
   for (const s of stars) {
     if (s.layer !== layer) continue;
     s.twinklePhase += s.twinkleSpeed * dt;
+    // Star drift
+    s.x = wrap(s.x + s.dx * dt, W);
+    s.y = wrap(s.y + s.dy * dt, H);
     const alpha = s.brightness * (0.5 + 0.5 * Math.sin(s.twinklePhase));
     const sx = wrap(s.x - camOX * px, W);
     const sy = wrap(s.y - camOY * px, H);
@@ -129,6 +132,47 @@ export function drawShieldEffect(ctx: CanvasRenderingContext2D, x: number, y: nu
   ctx.beginPath();
   ctx.arc(x, y, 6, 0, Math.PI * 2);
   ctx.stroke();
+}
+
+export function drawCombo(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  comboCount: number, comboDisplayTimer: number, lastComboScore: number,
+) {
+  if (comboCount <= 1 && comboDisplayTimer <= 0) return;
+  const alpha = comboDisplayTimer > 0 ? clamp(comboDisplayTimer / 0.5, 0, 1) : 1;
+  ctx.fillStyle = hexToRgba('#ffaa44', alpha);
+  ctx.font = '7px monospace';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'top';
+  if (comboCount > 1) {
+    ctx.fillText(`x${comboCount} COMBO`, W - 4, 22);
+  }
+  if (comboDisplayTimer > 0 && lastComboScore > 0) {
+    ctx.fillStyle = hexToRgba('#ffff44', alpha * 0.8);
+    ctx.font = '5px monospace';
+    ctx.fillText(`+${lastComboScore}`, W - 4, 30);
+  }
+}
+
+export function drawWaveAnnounce(
+  ctx: CanvasRenderingContext2D,
+  W: number, H: number,
+  waveLevel: number, timer: number,
+) {
+  if (timer <= 0) return;
+  const alpha = clamp(timer / 1.0, 0, 1);
+  // Scale text up then settle
+  const scale = timer > 2.0 ? 1.5 - (timer - 2.0) * 1.0 : 1.0;
+  ctx.save();
+  ctx.translate(W / 2, H / 2);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = hexToRgba(COL_HUD, alpha * 0.7);
+  ctx.font = '14px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`WAVE ${waveLevel}`, 0, 0);
+  ctx.restore();
 }
 
 export function drawActivePowerUps(

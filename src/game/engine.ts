@@ -12,7 +12,7 @@ import { InputManager } from './input';
 import {
   drawBackground, drawStars, drawAsteroidLayer,
   drawLasers, drawParticles, drawPowerUps, drawShip, drawShieldEffect,
-  drawHud, drawActivePowerUps, drawGameOver,
+  drawHud, drawActivePowerUps, drawCombo, drawWaveAnnounce, drawGameOver,
 } from './renderer';
 import { playShoot, playExplosion, playShipHit, playGameOver, playPickup, playBomb } from './sound';
 import type { LeaderboardEntry } from './leaderboard';
@@ -84,6 +84,16 @@ export class GameEngine {
   private shieldTimer = 0;
   private rapidfireTimer = 0;
 
+  // Combo system
+  private comboCount = 0;
+  private comboTimer = 0;
+  private comboDisplayTimer = 0;
+  private lastComboScore = 0;
+
+  // Wave announcements
+  private waveAnnounceTimer = 0;
+  private waveAnnounceLevel = 0;
+
   // Leaderboard
   private leaderboard: LeaderboardEntry[] = [];
   private scoreSubmitted = false;
@@ -124,6 +134,8 @@ export class GameEngine {
     const count = Math.floor((this.W * this.H) / 60);
     for (let i = 0; i < count; i++) {
       const layer = Math.random() < 0.6 ? 0 : 1;
+      const driftSpeed = layer === 0 ? 0.5 + Math.random() * 1 : 1 + Math.random() * 2;
+      const driftAngle = Math.random() * Math.PI * 2;
       this.stars.push({
         x: Math.random() * this.W,
         y: Math.random() * this.H,
@@ -131,6 +143,8 @@ export class GameEngine {
         twinklePhase: Math.random() * Math.PI * 2,
         twinkleSpeed: 0.5 + Math.random() * 2.5,
         layer,
+        dx: Math.cos(driftAngle) * driftSpeed,
+        dy: Math.sin(driftAngle) * driftSpeed,
       });
     }
   }
@@ -161,6 +175,12 @@ export class GameEngine {
     this.shakeY = 0;
     this.shieldTimer = 0;
     this.rapidfireTimer = 0;
+    this.comboCount = 0;
+    this.comboTimer = 0;
+    this.comboDisplayTimer = 0;
+    this.lastComboScore = 0;
+    this.waveAnnounceTimer = 0;
+    this.waveAnnounceLevel = 0;
     this.leaderboard = [];
     this.scoreSubmitted = false;
     this.input.stopInitialsMode();
@@ -245,7 +265,21 @@ export class GameEngine {
 
   private destroyAsteroid(a: Asteroid): void {
     a.active = false;
-    this.score += ASTEROID_TIERS[a.tier].score;
+    // Combo system
+    if (this.comboTimer > 0) {
+      this.comboCount++;
+    } else {
+      this.comboCount = 1;
+    }
+    this.comboTimer = 2.0;
+    const baseScore = ASTEROID_TIERS[a.tier].score;
+    const multiplier = Math.min(this.comboCount, 10);
+    const earned = baseScore * multiplier;
+    this.score += earned;
+    if (multiplier > 1) {
+      this.lastComboScore = earned;
+      this.comboDisplayTimer = 1.5;
+    }
     const r = ASTEROID_TIERS[a.tier].radius;
     this.spawnParticles(a.x, a.y, 5 + r, COL_PARTICLE, 25 + r * 2);
     this.spawnParticles(a.x, a.y, 3, COL_PARTICLE_BLUE, 15 + r);
@@ -365,6 +399,9 @@ export class GameEngine {
       this.difficultyTimer -= 15;
       this.difficulty++;
       this.spawnInterval = Math.max(2.5 - this.difficulty * 0.2, 0.8);
+      // Wave announcement
+      this.waveAnnounceTimer = 2.5;
+      this.waveAnnounceLevel = this.difficulty;
     }
 
     // Periodic asteroid spawns
@@ -399,6 +436,16 @@ export class GameEngine {
     // Power-up timers
     if (this.shieldTimer > 0) this.shieldTimer -= dt;
     if (this.rapidfireTimer > 0) this.rapidfireTimer -= dt;
+
+    // Combo decay
+    if (this.comboTimer > 0) {
+      this.comboTimer -= dt;
+      if (this.comboTimer <= 0) this.comboCount = 0;
+    }
+    if (this.comboDisplayTimer > 0) this.comboDisplayTimer -= dt;
+
+    // Wave announcement decay
+    if (this.waveAnnounceTimer > 0) this.waveAnnounceTimer -= dt;
 
     // Camera parallax offset
     this.camOX = (this.shipX - this.W / 2) * 0.1;
@@ -544,6 +591,12 @@ export class GameEngine {
       this.totalTime,
     );
     drawActivePowerUps(this.ctx, this.W, this.shieldTimer, this.rapidfireTimer);
+    drawCombo(this.ctx, this.W, this.comboCount, this.comboDisplayTimer, this.lastComboScore);
+
+    // Wave announcement
+    if (this.waveAnnounceTimer > 0) {
+      drawWaveAnnounce(this.ctx, this.W, this.H, this.waveAnnounceLevel, this.waveAnnounceTimer);
+    }
 
     // Game over overlay
     if (this.gameOver) {
