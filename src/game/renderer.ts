@@ -1,7 +1,8 @@
-import type { Asteroid, Laser, Particle, Star } from './types';
+import type { Asteroid, Laser, Particle, Star, PowerUp, PowerUpKind } from './types';
 import {
   COL_BG, COL_SHIP, COL_SHIP_ACCENT, COL_LASER, COL_LASER_GLOW,
-  COL_ASTEROID, COL_HUD, COL_STAR, ASTEROID_TIERS, PARALLAX,
+  COL_ASTEROID, COL_HUD, COL_STAR, COL_SHIELD, COL_RAPIDFIRE, COL_BOMB,
+  ASTEROID_TIERS, PARALLAX, POWERUP_RADIUS,
   hexToRgba, clamp, wrap,
 } from './types';
 
@@ -84,6 +85,66 @@ export function drawParticles(ctx: CanvasRenderingContext2D, particles: Particle
     if (!p.active) continue;
     ctx.fillStyle = hexToRgba(p.color, clamp(p.life / p.maxLife, 0, 1));
     ctx.fillRect(Math.floor(p.x), Math.floor(p.y), p.size, p.size);
+  }
+}
+
+function powerUpColor(kind: PowerUpKind): string {
+  return kind === 'shield' ? COL_SHIELD : kind === 'rapidfire' ? COL_RAPIDFIRE : COL_BOMB;
+}
+
+export function drawPowerUps(ctx: CanvasRenderingContext2D, powerups: PowerUp[], totalTime: number) {
+  for (const pu of powerups) {
+    if (!pu.active) continue;
+    const col = powerUpColor(pu.kind);
+    const pulse = 0.6 + 0.4 * Math.sin(totalTime * 6);
+    const r = POWERUP_RADIUS;
+    ctx.strokeStyle = hexToRgba(col, pulse);
+    ctx.lineWidth = 0.6;
+    // Diamond shape
+    ctx.beginPath();
+    ctx.moveTo(pu.x, pu.y - r);
+    ctx.lineTo(pu.x + r, pu.y);
+    ctx.lineTo(pu.x, pu.y + r);
+    ctx.lineTo(pu.x - r, pu.y);
+    ctx.closePath();
+    ctx.stroke();
+    // Center dot
+    ctx.fillStyle = hexToRgba(col, pulse);
+    ctx.fillRect(Math.floor(pu.x), Math.floor(pu.y), 1, 1);
+    // Label
+    ctx.fillStyle = hexToRgba(col, 0.8);
+    ctx.font = '3px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    const label = pu.kind === 'shield' ? 'S' : pu.kind === 'rapidfire' ? 'F' : 'B';
+    ctx.fillText(label, pu.x, pu.y - r - 1);
+  }
+}
+
+export function drawShieldEffect(ctx: CanvasRenderingContext2D, x: number, y: number, totalTime: number) {
+  const pulse = 0.2 + 0.15 * Math.sin(totalTime * 5);
+  ctx.strokeStyle = hexToRgba(COL_SHIELD, pulse);
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.arc(x, y, 6, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+export function drawActivePowerUps(
+  ctx: CanvasRenderingContext2D, W: number,
+  shieldTimer: number, rapidfireTimer: number,
+) {
+  const x = W - 4;
+  ctx.font = '5px monospace';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'top';
+  if (shieldTimer > 0) {
+    ctx.fillStyle = COL_SHIELD;
+    ctx.fillText(`SHIELD ${Math.ceil(shieldTimer)}s`, x, 14);
+  }
+  if (rapidfireTimer > 0) {
+    ctx.fillStyle = COL_RAPIDFIRE;
+    ctx.fillText(`RAPID ${Math.ceil(rapidfireTimer)}s`, x, shieldTimer > 0 ? 21 : 14);
   }
 }
 

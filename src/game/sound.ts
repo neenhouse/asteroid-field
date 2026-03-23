@@ -61,6 +61,45 @@ export function playShipHit(): void {
   }
 }
 
+export function playPickup(): void {
+  try {
+    const c = getCtx();
+    const notes = [523, 659, 784];
+    notes.forEach((freq, i) => {
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      const t = c.currentTime + i * 0.06;
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.08, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+      osc.connect(gain).connect(c.destination);
+      osc.start(t);
+      osc.stop(t + 0.06);
+    });
+  } catch {
+    /* audio not available */
+  }
+}
+
+export function playBomb(): void {
+  try {
+    const c = getCtx();
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(80, c.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(15, c.currentTime + 0.5);
+    gain.gain.setValueAtTime(0.2, c.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.5);
+    osc.connect(gain).connect(c.destination);
+    osc.start();
+    osc.stop(c.currentTime + 0.5);
+  } catch {
+    /* audio not available */
+  }
+}
+
 export function playGameOver(): void {
   try {
     const c = getCtx();

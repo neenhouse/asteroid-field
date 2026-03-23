@@ -52,6 +52,28 @@ export interface Star {
   twinklePhase: number; twinkleSpeed: number; layer: number;
 }
 
+// --- Power-ups ---
+
+export type PowerUpKind = 'shield' | 'rapidfire' | 'bomb';
+
+export interface PowerUp {
+  x: number; y: number;
+  kind: PowerUpKind;
+  life: number;
+  active: boolean;
+}
+
+export const POWERUP_DROP_CHANCE = 0.15;
+export const POWERUP_LIFETIME = 8;
+export const POWERUP_RADIUS = 4;
+export const SHIELD_DURATION = 6;
+export const RAPIDFIRE_DURATION = 5;
+export const RAPIDFIRE_COOLDOWN = 0.06;
+
+export const COL_SHIELD = '#44ff88';
+export const COL_RAPIDFIRE = '#ffff44';
+export const COL_BOMB = '#ff6644';
+
 // --- Utility functions ---
 
 export function hexToRgba(hex: string, alpha: number): string {

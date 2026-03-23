@@ -1,16 +1,20 @@
-import type { Asteroid, Laser, Particle, Star } from './types';
+import type { Asteroid, Laser, Particle, Star, PowerUp, PowerUpKind } from './types';
 import {
   SCALE, LASER_SPEED, LASER_LIFE, FIRE_COOLDOWN, START_LIVES,
   INVULN_TIME, HIT_RADIUS_SHIP, ASTEROID_TIERS, PARALLAX,
   COL_SHIP, COL_LASER_GLOW, COL_PARTICLE, COL_PARTICLE_BLUE,
+  COL_SHIELD, COL_RAPIDFIRE, COL_BOMB,
+  POWERUP_DROP_CHANCE, POWERUP_LIFETIME, POWERUP_RADIUS,
+  SHIELD_DURATION, RAPIDFIRE_DURATION, RAPIDFIRE_COOLDOWN,
   lerp, clamp, wrap, dist, randRange,
 } from './types';
 import { InputManager } from './input';
 import {
   drawBackground, drawStars, drawAsteroidLayer,
-  drawLasers, drawParticles, drawShip, drawHud,
+  drawLasers, drawParticles, drawPowerUps, drawShip, drawShieldEffect,
+  drawHud, drawActivePowerUps,
 } from './renderer';
-import { playShoot, playExplosion, playShipHit, playGameOver } from './sound';
+import { playShoot, playExplosion, playShipHit, playGameOver, playPickup, playBomb } from './sound';
 
 const MAX_DT = 0.05;
 const LS_KEY = 'asteroid-field-highscore';
@@ -53,6 +57,7 @@ export class GameEngine {
   private lasers: Laser[] = [];
   private particles: Particle[] = [];
   private stars: Star[] = [];
+  private powerups: PowerUp[] = [];
 
   // Game state
   private score = 0;
@@ -67,6 +72,15 @@ export class GameEngine {
   private totalTime = 0;
   private camOX = 0;
   private camOY = 0;
+
+  // Screen shake
+  private shakeIntensity = 0;
+  private shakeX = 0;
+  private shakeY = 0;
+
+  // Power-up effects
+  private shieldTimer = 0;
+  private rapidfireTimer = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -124,6 +138,7 @@ export class GameEngine {
     this.asteroids = [];
     this.lasers = [];
     this.particles = [];
+    this.powerups = [];
     this.score = 0;
     this.lives = START_LIVES;
     this.gameOver = false;
@@ -135,8 +150,12 @@ export class GameEngine {
     this.totalTime = 0;
     this.camOX = 0;
     this.camOY = 0;
+    this.shakeIntensity = 0;
+    this.shakeX = 0;
+    this.shakeY = 0;
+    this.shieldTimer = 0;
+    this.rapidfireTimer = 0;
     this.initStars();
-    // Initial asteroid field
     for (let i = 0; i < 5; i++) this.spawnAsteroid(0, 2);
     for (let i = 0; i < 4; i++) this.spawnAsteroid(1, 1);
     for (let i = 0; i < 8; i++) this.spawnAsteroid(1, 0);
@@ -192,6 +211,13 @@ export class GameEngine {
     }
   }
 
+  private spawnPowerUp(x: number, y: number): void {
+    if (Math.random() > POWERUP_DROP_CHANCE) return;
+    const kinds: PowerUpKind[] = ['shield', 'rapidfire', 'bomb'];
+    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    this.powerups.push({ x, y, kind, life: POWERUP_LIFETIME, active: true });
+  }
+
   private fireLaser(): void {
     if (this.fireCooldown > 0 || !this.shipAlive || this.gameOver) return;
     const tipX = this.shipX + Math.cos(this.shipAngle) * 4;
@@ -202,7 +228,8 @@ export class GameEngine {
       vy: Math.sin(this.shipAngle) * LASER_SPEED,
       life: LASER_LIFE, active: true,
     });
-    this.fireCooldown = FIRE_COOLDOWN;
+    const cooldown = this.rapidfireTimer > 0 ? RAPIDFIRE_COOLDOWN : FIRE_COOLDOWN;
+    this.fireCooldown = cooldown;
     this.spawnParticles(tipX, tipY, 3, COL_LASER_GLOW, 20);
     playShoot();
   }
@@ -214,6 +241,12 @@ export class GameEngine {
     this.spawnParticles(a.x, a.y, 5 + r, COL_PARTICLE, 25 + r * 2);
     this.spawnParticles(a.x, a.y, 3, COL_PARTICLE_BLUE, 15 + r);
     playExplosion(a.tier === 0);
+    // Screen shake based on asteroid size
+    const shakeAmt = a.tier === 0 ? 3 : a.tier === 1 ? 1.5 : 0.5;
+    this.shakeIntensity = Math.max(this.shakeIntensity, shakeAmt);
+    // Maybe drop power-up
+    if (a.layer === 2) this.spawnPowerUp(a.x, a.y);
+    // Split
     if (a.tier < ASTEROID_TIERS.length - 1) {
       const next = a.tier + 1;
       const count = a.tier === 0 ? 3 : 2;
@@ -224,10 +257,31 @@ export class GameEngine {
     }
   }
 
+  private activateBomb(): void {
+    playBomb();
+    this.shakeIntensity = Math.max(this.shakeIntensity, 6);
+    for (const a of this.asteroids) {
+      if (!a.active || a.layer !== 2) continue;
+      a.active = false;
+      this.score += ASTEROID_TIERS[a.tier].score;
+      this.spawnParticles(a.x, a.y, 4, COL_BOMB, 30);
+    }
+    // Flash effect
+    this.spawnParticles(this.shipX, this.shipY, 20, COL_BOMB, 60, 2);
+  }
+
   private shipHit(): void {
+    // Shield absorbs the hit
+    if (this.shieldTimer > 0) {
+      this.shieldTimer = 0;
+      this.spawnParticles(this.shipX, this.shipY, 10, COL_SHIELD, 40);
+      this.invulnTimer = 0.5;
+      return;
+    }
     this.lives--;
     this.spawnParticles(this.shipX, this.shipY, 12, COL_SHIP, 45);
     this.spawnParticles(this.shipX, this.shipY, 8, COL_PARTICLE, 30);
+    this.shakeIntensity = Math.max(this.shakeIntensity, 6);
     playShipHit();
     if (this.lives <= 0) {
       this.shipAlive = false;
@@ -299,6 +353,7 @@ export class GameEngine {
       this.spawnAsteroid(tier, layer);
     }
 
+    // Shooting
     if (this.fireCooldown > 0) this.fireCooldown -= dt;
     if (this.input.mouseDown && this.fireCooldown <= 0 && this.shipAlive) this.fireLaser();
 
@@ -317,9 +372,25 @@ export class GameEngine {
       if (this.invulnTimer > 0) this.invulnTimer -= dt;
     }
 
+    // Power-up timers
+    if (this.shieldTimer > 0) this.shieldTimer -= dt;
+    if (this.rapidfireTimer > 0) this.rapidfireTimer -= dt;
+
     // Camera parallax offset
     this.camOX = (this.shipX - this.W / 2) * 0.1;
     this.camOY = (this.shipY - this.H / 2) * 0.1;
+
+    // Screen shake decay
+    if (this.shakeIntensity > 0) {
+      this.shakeX = (Math.random() - 0.5) * this.shakeIntensity * 2;
+      this.shakeY = (Math.random() - 0.5) * this.shakeIntensity * 2;
+      this.shakeIntensity *= 0.88;
+      if (this.shakeIntensity < 0.2) {
+        this.shakeIntensity = 0;
+        this.shakeX = 0;
+        this.shakeY = 0;
+      }
+    }
 
     // Move lasers
     for (const l of this.lasers) {
@@ -354,6 +425,32 @@ export class GameEngine {
       if (p.life <= 0) p.active = false;
     }
 
+    // Power-up lifetime
+    for (const pu of this.powerups) {
+      if (!pu.active) continue;
+      pu.life -= dt;
+      if (pu.life <= 0) pu.active = false;
+    }
+
+    // Ship picks up power-ups
+    if (this.shipAlive) {
+      for (const pu of this.powerups) {
+        if (!pu.active) continue;
+        if (dist(this.shipX, this.shipY, pu.x, pu.y) < POWERUP_RADIUS + HIT_RADIUS_SHIP) {
+          pu.active = false;
+          playPickup();
+          this.spawnParticles(pu.x, pu.y, 6,
+            pu.kind === 'shield' ? COL_SHIELD : pu.kind === 'rapidfire' ? COL_RAPIDFIRE : COL_BOMB,
+            25);
+          switch (pu.kind) {
+            case 'shield': this.shieldTimer = SHIELD_DURATION; break;
+            case 'rapidfire': this.rapidfireTimer = RAPIDFIRE_DURATION; break;
+            case 'bomb': this.activateBomb(); break;
+          }
+        }
+      }
+    }
+
     // Laser vs near-layer asteroid collisions
     for (const l of this.lasers) {
       if (!l.active) continue;
@@ -383,12 +480,18 @@ export class GameEngine {
     this.lasers = this.lasers.filter((l) => l.active);
     this.asteroids = this.asteroids.filter((a) => a.active);
     this.particles = this.particles.filter((p) => p.active);
+    this.powerups = this.powerups.filter((pu) => pu.active);
+
   }
 
   // --- Draw ---
 
   private draw(dt: number): void {
     drawBackground(this.ctx, this.W, this.H);
+
+    // Apply screen shake
+    this.ctx.save();
+    this.ctx.translate(this.shakeX, this.shakeY);
 
     // Stars and asteroids, back to front
     drawStars(this.ctx, this.stars, dt, 0, this.camOX, this.camOY, this.W, this.H);
@@ -398,18 +501,24 @@ export class GameEngine {
     drawAsteroidLayer(this.ctx, this.asteroids, 2, this.camOX, this.camOY);
 
     drawLasers(this.ctx, this.lasers);
+    drawPowerUps(this.ctx, this.powerups, this.totalTime);
     drawParticles(this.ctx, this.particles);
 
     // Ship
     if (this.shipAlive) {
       const show = this.invulnTimer <= 0 || Math.floor(this.invulnTimer * 10) % 2 === 0;
       if (show) drawShip(this.ctx, this.shipX, this.shipY, this.shipAngle, this.totalTime);
+      if (this.shieldTimer > 0) drawShieldEffect(this.ctx, this.shipX, this.shipY, this.totalTime);
     }
 
+    this.ctx.restore();
+
+    // HUD drawn without shake
     drawHud(
       this.ctx, this.W, this.H,
       this.score, this.lives, this.difficulty,
       this.totalTime, this.gameOver, this.highScore,
     );
+    drawActivePowerUps(this.ctx, this.W, this.shieldTimer, this.rapidfireTimer);
   }
 }
