@@ -44,7 +44,7 @@ export function drawAsteroidLayer(
     const dy = a.y + offY;
 
     ctx.strokeStyle = hexToRgba(color, alphaBase);
-    ctx.lineWidth = layer === 2 ? 0.6 : 0.4;
+    ctx.lineWidth = layer === 2 ? 0.8 : 0.5;
     ctx.beginPath();
     for (let i = 0; i <= pts; i++) {
       const idx = i % pts;
@@ -102,7 +102,7 @@ export function drawShip(
 
   // Wireframe triangle
   ctx.strokeStyle = COL_SHIP;
-  ctx.lineWidth = 0.6;
+  ctx.lineWidth = 0.8;
   ctx.beginPath();
   ctx.moveTo(nX, nY);
   ctx.lineTo(lX, lY);
@@ -131,53 +131,66 @@ export function drawHud(
   score: number, lives: number, difficulty: number,
   totalTime: number, gameOver: boolean, highScore: number,
 ) {
-  ctx.font = '5px monospace';
+  ctx.font = '7px monospace';
   ctx.textBaseline = 'top';
 
   // Score
   ctx.fillStyle = COL_HUD;
   ctx.textAlign = 'left';
-  ctx.fillText(`SCORE ${score}`, 4, 4);
+  ctx.fillText(`SCORE ${score}`, 4, 3);
 
   // Lives as diamonds
   ctx.textAlign = 'center';
-  ctx.fillText(
-    Array.from({ length: lives }, () => '\u25c6').join(' '),
-    W / 2,
-    4,
-  );
+  const diamondSize = 3;
+  const gap = 8;
+  const startX = W / 2 - ((lives - 1) * gap) / 2;
+  for (let i = 0; i < lives; i++) {
+    const cx = Math.floor(startX + i * gap);
+    const cy = 7;
+    ctx.fillStyle = COL_HUD;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - diamondSize);
+    ctx.lineTo(cx + diamondSize * 0.7, cy);
+    ctx.lineTo(cx, cy + diamondSize);
+    ctx.lineTo(cx - diamondSize * 0.7, cy);
+    ctx.closePath();
+    ctx.fill();
+  }
 
   // Level
+  ctx.fillStyle = COL_HUD;
   ctx.textAlign = 'right';
-  ctx.fillText(`LV ${difficulty}`, W - 4, 4);
+  ctx.fillText(`LV ${difficulty}`, W - 4, 3);
 
   // Fading controls hint
   if (totalTime < 5) {
-    ctx.fillStyle = hexToRgba(COL_HUD, clamp(1 - totalTime / 5, 0, 1) * 0.6);
+    ctx.fillStyle = hexToRgba(COL_HUD, clamp(1 - totalTime / 5, 0, 1) * 0.7);
     ctx.textAlign = 'center';
-    ctx.fillText('MOVE: mouse   SHOOT: click   RESTART: R', W / 2, H - 10);
+    ctx.font = '6px monospace';
+    ctx.fillText('MOVE: mouse   SHOOT: click   R: restart', W / 2, H - 12);
   }
 
   // Game over overlay
   if (gameOver) {
-    ctx.fillStyle = hexToRgba(COL_BG, 0.6);
+    ctx.fillStyle = hexToRgba(COL_BG, 0.65);
     ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = hexToRgba(COL_HUD, 0.95);
-    ctx.font = '8px monospace';
+    ctx.fillStyle = COL_HUD;
+    ctx.font = '12px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('GAME OVER', W / 2, H / 2 - 8);
-    ctx.font = '5px monospace';
-    ctx.fillStyle = hexToRgba(COL_STAR[0], 0.8);
+    ctx.fillText('GAME OVER', W / 2, H / 2 - 12);
+    ctx.font = '7px monospace';
+    ctx.fillStyle = hexToRgba(COL_STAR[0], 0.9);
     ctx.fillText(`SCORE: ${score}`, W / 2, H / 2 + 2);
     if (highScore > 0 && score >= highScore) {
-      ctx.fillStyle = hexToRgba(COL_HUD, 0.8);
-      ctx.fillText('NEW HIGH SCORE!', W / 2, H / 2 + 9);
+      ctx.fillStyle = COL_HUD;
+      ctx.fillText('NEW HIGH SCORE!', W / 2, H / 2 + 12);
     } else if (highScore > 0) {
-      ctx.fillStyle = hexToRgba(COL_STAR[1], 0.6);
-      ctx.fillText(`HIGH: ${highScore}`, W / 2, H / 2 + 9);
+      ctx.fillStyle = hexToRgba(COL_STAR[1], 0.7);
+      ctx.fillText(`HIGH: ${highScore}`, W / 2, H / 2 + 12);
     }
-    ctx.fillStyle = hexToRgba(COL_STAR[0], 0.6);
-    ctx.fillText('CLICK or R to restart', W / 2, H / 2 + 18);
+    ctx.font = '6px monospace';
+    ctx.fillStyle = hexToRgba(COL_STAR[0], 0.7);
+    ctx.fillText('CLICK or R to restart', W / 2, H / 2 + 24);
   }
 }
