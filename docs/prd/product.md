@@ -63,29 +63,30 @@ Browser-playable retro space game where the player dodges and shoots asteroids i
 - [x] **REQ-13**: Score display and scoring system `COMPLETE`
   - AC: Score shown top-left; small=100, medium=50, large=25 points
 - [x] **REQ-14**: Lives system with game over `COMPLETE`
-  - AC: 3 lives displayed as ship icons top-right; game over shows final score with restart prompt
+  - AC: 3 lives displayed as cyan diamonds top-center; LV indicator top-right; game over shows final score with restart prompt
 - [x] **REQ-15**: Escalating difficulty over time `COMPLETE`
   - AC: Spawn rate and asteroid speed increase every 30 seconds via difficulty multiplier
 
-## Intent Backlog
+## Completed Enhancements
 
-- **High score persistence**: Store top scores in localStorage so players can track personal bests across sessions.
-- **Screen shake**: Camera shake on ship hit and large asteroid destruction for juice.
-- **Sound effects**: Retro bleeps and bloops for shooting, explosions, and game over.
-- **CRT scanline overlay**: Optional CSS/canvas overlay for authentic retro CRT feel.
-- **Mobile touch controls**: On-screen joystick and fire button for mobile play.
+- **High score persistence** `COMPLETE`: Top score saved to localStorage; shown on menu and game over screens; "NEW HIGH SCORE!" callout.
+- **Screen shake** `COMPLETE`: Camera shake on ship hit (intensity 8) and asteroid destruction (intensity 1–4); shake decays exponentially.
+- **Sound effects** `COMPLETE`: Web Audio API retro sounds — square wave shoot blip, sawtooth explosion sweep, descending game over tones.
+- **CRT scanline overlay** `COMPLETE`: CSS repeating-gradient scanlines + vignette box-shadow overlay.
+- **Mobile touch controls** `COMPLETE`: Left-half virtual joystick, right-half fire zone; visual indicators on touch devices via CSS media query.
 
 ## Technical Reference
 
 ### Key Files
-- `src/App.tsx` — React component hosting the game canvas
-- `src/game/engine.ts` — GameEngine class: loop, state machine, spawning, difficulty
+- `src/App.tsx` — React component: canvas + CRT overlay + touch control indicators
+- `src/game/engine.ts` — GameEngine class: loop, state machine, spawning, difficulty, shake, high scores
 - `src/game/types.ts` — All interfaces, type aliases, and game constants
 - `src/game/entities.ts` — Entity creation, update, splitting, and particle spawning
 - `src/game/collision.ts` — Circle-circle collision detection for ship and projectiles
-- `src/game/renderer.ts` — Canvas 2D drawing: entities, HUD, menu/game-over screens
-- `src/game/input.ts` — Keyboard input manager with held/just-pressed tracking
-- `src/App.css` — Canvas scaling with `image-rendering: pixelated`
+- `src/game/renderer.ts` — Canvas 2D wireframe drawing: entities, HUD, menu/game-over screens
+- `src/game/input.ts` — Keyboard + touch input manager with virtual joystick and fire
+- `src/game/sound.ts` — Web Audio API retro sound effects (shoot, explosion, hit, game over)
+- `src/App.css` — Canvas scaling, CRT scanlines/vignette, mobile touch controls
 - `src/index.css` — Dark background, viewport centering
 
 ### Architecture Notes

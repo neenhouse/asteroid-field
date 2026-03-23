@@ -14,5 +14,14 @@ export default function App() {
     return () => engine.stop();
   }, []);
 
-  return <canvas ref={canvasRef} className="game-canvas" />;
+  return (
+    <div className="game-container">
+      <canvas ref={canvasRef} className="game-canvas" />
+      <div className="crt-overlay" />
+      <div className="touch-controls">
+        <div className="touch-move">MOVE</div>
+        <div className="touch-fire">FIRE</div>
+      </div>
+    </div>
+  );
 }

@@ -32,6 +32,12 @@ export interface Particle {
   life: number; // 1.0 → 0.0
 }
 
+export interface ScreenShake {
+  intensity: number;
+  offsetX: number;
+  offsetY: number;
+}
+
 export type GamePhase = 'menu' | 'playing' | 'gameOver';
 
 export interface GameState {
@@ -41,12 +47,15 @@ export interface GameState {
   projectiles: Projectile[];
   particles: Particle[];
   score: number;
+  highScore: number;
+  level: number;
   difficulty: number;
   lastSpawnTime: number;
   elapsedTime: number;
+  shake: ScreenShake;
 }
 
-// Canvas internal resolution (scaled up with CSS)
+// Canvas internal resolution
 export const GAME_WIDTH = 480;
 export const GAME_HEIGHT = 360;
 
