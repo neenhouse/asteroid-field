@@ -1,7 +1,7 @@
 ---
 title: Asteroid Field Product Requirements
 status: ACTIVE
-last_updated: 2026-03-22
+last_updated: 2026-03-23
 ---
 
 # Asteroid Field — Product Requirements
@@ -21,7 +21,11 @@ Browser-playable retro space game faithfully ported from the retro-pixel.neenhou
 | Game Flow | COMPLETE | No menu — starts immediately, game over overlay, click/R to restart |
 | Sound Effects | COMPLETE | Web Audio API retro sounds (shoot, explode, hit, game over) |
 | High Scores | COMPLETE | localStorage persistence, shown on game over screen |
+| Screen Shake | COMPLETE | Camera shake on asteroid destruction and ship hits |
+| Power-Ups | COMPLETE | Shield, rapid fire, bomb — dropped from near-layer asteroids |
 | CRT Overlay | COMPLETE | CSS scanlines + vignette |
+| Cloud Leaderboard | COMPLETE | D1 database, Pages Function API, arcade-style initials |
+| Tests | COMPLETE | Vitest with 24 unit tests for utility functions |
 | Deployment | COMPLETE | Cloudflare Pages via GitHub Actions, custom domain |
 
 ## Active Requirements
@@ -81,22 +85,49 @@ Browser-playable retro space game faithfully ported from the retro-pixel.neenhou
 - [x] **REQ-20**: CRT scanline overlay `COMPLETE`
   - AC: CSS repeating-gradient scanlines + vignette; subtle opacity to preserve readability
 
+### Screen Shake
+
+- [x] **REQ-21**: Screen shake on impacts `COMPLETE`
+  - AC: Shake intensity 0.5–3 on asteroid destruction (by tier), 6 on ship hit; exponential decay; HUD unaffected
+
+### Power-Ups
+
+- [x] **REQ-22**: Power-up drops from destroyed near-layer asteroids `COMPLETE`
+  - AC: 15% drop chance; 3 types: Shield (S, 6s invulnerability), Rapid Fire (F, 5s 0.06s cooldown), Bomb (B, instant near-layer clear)
+- [x] **REQ-23**: Power-up rendering and pickup `COMPLETE`
+  - AC: Pulsing diamond icons with labels; circle collision pickup; particles + sound on collect; active timers in HUD
+
+### Cloud Leaderboard
+
+- [x] **REQ-24**: Cloudflare D1 leaderboard backend `COMPLETE`
+  - AC: Pages Function at /api/scores; GET returns top 10; POST accepts {name, score}; 3-letter initials sanitized
+- [x] **REQ-25**: Arcade-style initials entry on game over `COMPLETE`
+  - AC: Type 3 letters (A-Z); blinking cursor; auto-submits on 3rd letter or Enter; leaderboard displayed after
+
+### Tests
+
+- [x] **REQ-26**: Vitest test infrastructure `COMPLETE`
+  - AC: 24 unit tests for utility functions (hexToRgba, lerp, clamp, wrap, dist, randRange); `pnpm test` script
+
 ## Intent Backlog
 
 - **Twinkling star parallax**: Stars already twinkle; could add slow drift for more immersion.
-- **Power-ups**: Shield, rapid fire, bomb — dropped from destroyed asteroids.
-- **Leaderboard**: Cloud-stored high scores with player names.
-- **Screen shake**: On ship hit and large asteroid destruction (was implemented, removed in rewrite — could re-add).
+- **Combo system**: Multiplier for rapid consecutive kills.
+- **Visual wave announcements**: "WAVE 2" text flash on difficulty increase.
 
 ## Technical Reference
 
 ### Key Files
 - `src/App.tsx` — React component: canvas + CRT overlay
-- `src/game/engine.ts` — GameEngine class: state, update loop, spawning, collision, rendering orchestration
-- `src/game/types.ts` — Constants, interfaces, colors, utility functions (hexToRgba, lerp, clamp, wrap, dist)
-- `src/game/renderer.ts` — Canvas 2D drawing: stars, asteroids (per-layer), ship, lasers, particles, HUD
-- `src/game/input.ts` — Mouse/touch input manager with click/drag tracking
-- `src/game/sound.ts` — Web Audio API retro sound effects
+- `src/game/engine.ts` — GameEngine class: state, update loop, spawning, collision, power-ups, leaderboard, shake
+- `src/game/types.ts` — Constants, interfaces, colors, power-up types, utility functions
+- `src/game/renderer.ts` — Canvas 2D drawing: stars, asteroids, ship, lasers, particles, power-ups, HUD, game over
+- `src/game/leaderboard.ts` — API client for D1 leaderboard (fetch/submit)
+- `src/game/input.ts` — Mouse/touch input manager with click/drag + initials entry
+- `src/game/sound.ts` — Web Audio API retro sound effects (shoot, explode, hit, pickup, bomb, game over)
+- `src/game/__tests__/types.test.ts` — 24 unit tests for utility functions
+- `functions/api/scores.ts` — Cloudflare Pages Function for leaderboard API
+- `wrangler.toml` — Cloudflare config with D1 binding
 - `src/App.css` — Full-viewport canvas scaling, CRT scanlines/vignette
 - `src/index.css` — Dark background, viewport setup
 
@@ -109,3 +140,5 @@ Browser-playable retro space game faithfully ported from the retro-pixel.neenhou
 - Ship follows mouse via lerp with exponential smoothing; rotates to face cursor
 - Red laser lines with glow pixel + muzzle flash particles
 - Entity lifecycle uses `active` flag + array filter cleanup (matching original's pattern)
+- Power-ups: 15% drop from near-layer kills; shield/rapidfire are timed buffs, bomb is instant
+- Leaderboard: D1 database → Pages Function → game over overlay; arcade 3-letter initials
