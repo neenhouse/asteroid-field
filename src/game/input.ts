@@ -64,8 +64,26 @@ export class InputManager {
     this.mouseDown = false;
   };
 
+  // Initials input state
+  initials = '';
+  initialsSubmitted = false;
+  private _initialsMode = false;
+
   private onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'r' || e.key === 'R') this._resetRequested = true;
+    if (e.key === 'r' || e.key === 'R') {
+      if (!this._initialsMode) this._resetRequested = true;
+    }
+    // Initials entry
+    if (this._initialsMode) {
+      if (/^[a-zA-Z]$/.test(e.key) && this.initials.length < 3) {
+        this.initials += e.key.toUpperCase();
+        if (this.initials.length === 3) this.initialsSubmitted = true;
+      } else if (e.key === 'Backspace' && this.initials.length > 0) {
+        this.initials = this.initials.slice(0, -1);
+      } else if (e.key === 'Enter' && this.initials.length > 0) {
+        this.initialsSubmitted = true;
+      }
+    }
   };
 
   get clicked(): boolean {
@@ -74,6 +92,20 @@ export class InputManager {
 
   get resetRequested(): boolean {
     return this._resetRequested;
+  }
+
+  startInitialsMode(): void {
+    this._initialsMode = true;
+    this.initials = '';
+    this.initialsSubmitted = false;
+  }
+
+  stopInitialsMode(): void {
+    this._initialsMode = false;
+  }
+
+  get isInInitialsMode(): boolean {
+    return this._initialsMode;
   }
 
   clearFrame(): void {

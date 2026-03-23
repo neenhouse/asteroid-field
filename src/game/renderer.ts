@@ -1,4 +1,5 @@
 import type { Asteroid, Laser, Particle, Star, PowerUp, PowerUpKind } from './types';
+import type { LeaderboardEntry } from './leaderboard';
 import {
   COL_BG, COL_SHIP, COL_SHIP_ACCENT, COL_LASER, COL_LASER_GLOW,
   COL_ASTEROID, COL_HUD, COL_STAR, COL_SHIELD, COL_RAPIDFIRE, COL_BOMB,
@@ -190,7 +191,7 @@ export function drawHud(
   ctx: CanvasRenderingContext2D,
   W: number, H: number,
   score: number, lives: number, difficulty: number,
-  totalTime: number, gameOver: boolean, highScore: number,
+  totalTime: number,
 ) {
   ctx.font = '7px monospace';
   ctx.textBaseline = 'top';
@@ -231,27 +232,84 @@ export function drawHud(
     ctx.fillText('MOVE: mouse   SHOOT: click   R: restart', W / 2, H - 12);
   }
 
-  // Game over overlay
-  if (gameOver) {
-    ctx.fillStyle = hexToRgba(COL_BG, 0.65);
-    ctx.fillRect(0, 0, W, H);
+  // Game over overlay is drawn separately via drawGameOver
+}
+
+export function drawGameOver(
+  ctx: CanvasRenderingContext2D,
+  W: number, H: number,
+  score: number,
+  initials: string, initialsMode: boolean, scoreSubmitted: boolean,
+  leaderboard: LeaderboardEntry[],
+  totalTime: number,
+) {
+  ctx.fillStyle = hexToRgba(COL_BG, 0.7);
+  ctx.fillRect(0, 0, W, H);
+
+  const cx = W / 2;
+  let y = H * 0.15;
+
+  // Title
+  ctx.fillStyle = COL_HUD;
+  ctx.font = '12px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('GAME OVER', cx, y);
+  y += 14;
+
+  // Score
+  ctx.font = '7px monospace';
+  ctx.fillStyle = hexToRgba(COL_STAR[0], 0.9);
+  ctx.fillText(`SCORE: ${score}`, cx, y);
+  y += 12;
+
+  // Initials input or submitted confirmation
+  if (initialsMode && !scoreSubmitted) {
     ctx.fillStyle = COL_HUD;
-    ctx.font = '12px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('GAME OVER', W / 2, H / 2 - 12);
-    ctx.font = '7px monospace';
-    ctx.fillStyle = hexToRgba(COL_STAR[0], 0.9);
-    ctx.fillText(`SCORE: ${score}`, W / 2, H / 2 + 2);
-    if (highScore > 0 && score >= highScore) {
-      ctx.fillStyle = COL_HUD;
-      ctx.fillText('NEW HIGH SCORE!', W / 2, H / 2 + 12);
-    } else if (highScore > 0) {
-      ctx.fillStyle = hexToRgba(COL_STAR[1], 0.7);
-      ctx.fillText(`HIGH: ${highScore}`, W / 2, H / 2 + 12);
-    }
     ctx.font = '6px monospace';
-    ctx.fillStyle = hexToRgba(COL_STAR[0], 0.7);
-    ctx.fillText('CLICK or R to restart', W / 2, H / 2 + 24);
+    ctx.fillText('ENTER INITIALS:', cx, y);
+    y += 10;
+    // Draw initials with cursor
+    const display = initials + (initials.length < 3 ? (Math.floor(totalTime * 3) % 2 === 0 ? '_' : ' ') : '');
+    ctx.font = '10px monospace';
+    ctx.fillStyle = COL_HUD;
+    ctx.fillText(display, cx, y);
+    y += 12;
+  } else if (scoreSubmitted) {
+    ctx.fillStyle = hexToRgba(COL_HUD, 0.8);
+    ctx.font = '6px monospace';
+    ctx.fillText('SCORE SUBMITTED!', cx, y);
+    y += 12;
   }
+
+  // Leaderboard
+  if (leaderboard.length > 0) {
+    y += 4;
+    ctx.fillStyle = hexToRgba(COL_HUD, 0.7);
+    ctx.font = '6px monospace';
+    ctx.fillText('-- TOP SCORES --', cx, y);
+    y += 8;
+
+    ctx.font = '5px monospace';
+    for (let i = 0; i < leaderboard.length; i++) {
+      const entry = leaderboard[i];
+      const rank = `${i + 1}`.padStart(2, ' ');
+      const name = entry.name.padEnd(3, ' ');
+      const pts = `${entry.score}`;
+
+      // Highlight if this is the player's just-submitted score
+      const isPlayer = scoreSubmitted && entry.name === initials && entry.score === score;
+      ctx.fillStyle = isPlayer ? COL_HUD : hexToRgba(COL_STAR[0], 0.7);
+      ctx.textAlign = 'center';
+      ctx.fillText(`${rank}. ${name}  ${pts}`, cx, y);
+      y += 7;
+    }
+  }
+
+  // Restart hint
+  y = H * 0.92;
+  ctx.font = '5px monospace';
+  ctx.fillStyle = hexToRgba(COL_STAR[0], 0.6);
+  ctx.textAlign = 'center';
+  ctx.fillText(scoreSubmitted || !initialsMode ? 'CLICK or R to restart' : '', cx, y);
 }

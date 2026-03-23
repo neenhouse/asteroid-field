@@ -12,9 +12,11 @@ import { InputManager } from './input';
 import {
   drawBackground, drawStars, drawAsteroidLayer,
   drawLasers, drawParticles, drawPowerUps, drawShip, drawShieldEffect,
-  drawHud, drawActivePowerUps,
+  drawHud, drawActivePowerUps, drawGameOver,
 } from './renderer';
 import { playShoot, playExplosion, playShipHit, playGameOver, playPickup, playBomb } from './sound';
+import type { LeaderboardEntry } from './leaderboard';
+import { fetchLeaderboard, submitScore } from './leaderboard';
 
 const MAX_DT = 0.05;
 const LS_KEY = 'asteroid-field-highscore';
@@ -81,6 +83,10 @@ export class GameEngine {
   // Power-up effects
   private shieldTimer = 0;
   private rapidfireTimer = 0;
+
+  // Leaderboard
+  private leaderboard: LeaderboardEntry[] = [];
+  private scoreSubmitted = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -155,6 +161,9 @@ export class GameEngine {
     this.shakeY = 0;
     this.shieldTimer = 0;
     this.rapidfireTimer = 0;
+    this.leaderboard = [];
+    this.scoreSubmitted = false;
+    this.input.stopInitialsMode();
     this.initStars();
     for (let i = 0; i < 5; i++) this.spawnAsteroid(0, 2);
     for (let i = 0; i < 4; i++) this.spawnAsteroid(1, 1);
@@ -291,6 +300,10 @@ export class GameEngine {
         saveHighScore(this.score);
       }
       playGameOver();
+      // Start leaderboard flow
+      this.input.startInitialsMode();
+      this.scoreSubmitted = false;
+      fetchLeaderboard().then((lb) => { this.leaderboard = lb; });
     } else {
       this.invulnTimer = INVULN_TIME;
     }
@@ -314,10 +327,21 @@ export class GameEngine {
       this.ctx.imageSmoothingEnabled = false;
     }
 
-    // Handle restart
-    if (this.input.resetRequested) {
+    // Handle initials submission
+    if (this.gameOver && this.input.isInInitialsMode && this.input.initialsSubmitted && !this.scoreSubmitted) {
+      this.scoreSubmitted = true;
+      this.input.stopInitialsMode();
+      const name = this.input.initials;
+      const score = this.score;
+      submitScore(name, score).then(() => {
+        fetchLeaderboard().then((lb) => { this.leaderboard = lb; });
+      });
+    }
+
+    // Handle restart (only after submission or if no initials mode)
+    if (this.input.resetRequested && (!this.input.isInInitialsMode || this.scoreSubmitted)) {
       this.resetGame();
-    } else if (this.gameOver && this.input.clicked) {
+    } else if (this.gameOver && this.input.clicked && this.scoreSubmitted) {
       this.resetGame();
     } else {
       if (this.input.clicked && !this.gameOver) this.fireLaser();
@@ -517,8 +541,18 @@ export class GameEngine {
     drawHud(
       this.ctx, this.W, this.H,
       this.score, this.lives, this.difficulty,
-      this.totalTime, this.gameOver, this.highScore,
+      this.totalTime,
     );
     drawActivePowerUps(this.ctx, this.W, this.shieldTimer, this.rapidfireTimer);
+
+    // Game over overlay
+    if (this.gameOver) {
+      drawGameOver(
+        this.ctx, this.W, this.H,
+        this.score,
+        this.input.initials, this.input.isInInitialsMode, this.scoreSubmitted,
+        this.leaderboard, this.totalTime,
+      );
+    }
   }
 }
