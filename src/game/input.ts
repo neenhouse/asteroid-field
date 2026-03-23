@@ -1,123 +1,93 @@
-const GAME_KEYS = new Set([
-  'Space',
-  'ArrowUp',
-  'ArrowDown',
-  'ArrowLeft',
-  'ArrowRight',
-  'KeyW',
-  'KeyA',
-  'KeyS',
-  'KeyD',
-]);
+import { SCALE } from './types';
 
 export class InputManager {
-  private held = new Set<string>();
-  private pressed = new Set<string>();
+  mouseX: number;
+  mouseY: number;
+  mouseDown = false;
+  private _clicked = false;
+  private _resetRequested = false;
 
-  // Touch state
-  private joystickId: number | null = null;
-  private joystickOrigin: { x: number; y: number } | null = null;
-  private virtualDx = 0;
-  private virtualDy = 0;
-  private virtualFire = false;
-  private virtualTapped = false;
+  constructor(w: number, h: number) {
+    this.mouseX = w / 2;
+    this.mouseY = h / 2;
 
-  private onKeyDown = (e: KeyboardEvent) => {
-    if (GAME_KEYS.has(e.code)) e.preventDefault();
-    if (!this.held.has(e.code)) this.pressed.add(e.code);
-    this.held.add(e.code);
+    window.addEventListener('mousemove', this.onMouseMove);
+    window.addEventListener('mousedown', this.onMouseDown);
+    window.addEventListener('mouseup', this.onMouseUp);
+    window.addEventListener('touchmove', this.onTouchMove, { passive: false });
+    window.addEventListener('touchstart', this.onTouchStart, { passive: false });
+    window.addEventListener('touchend', this.onTouchEnd);
+    window.addEventListener('keydown', this.onKeyDown);
+  }
+
+  private screenToArt(sx: number, sy: number) {
+    return { ax: sx / SCALE, ay: sy / SCALE };
+  }
+
+  private onMouseMove = (e: MouseEvent) => {
+    const { ax, ay } = this.screenToArt(e.clientX, e.clientY);
+    this.mouseX = ax;
+    this.mouseY = ay;
   };
 
-  private onKeyUp = (e: KeyboardEvent) => {
-    this.held.delete(e.code);
+  private onMouseDown = (e: MouseEvent) => {
+    const { ax, ay } = this.screenToArt(e.clientX, e.clientY);
+    this.mouseX = ax;
+    this.mouseY = ay;
+    this.mouseDown = true;
+    this._clicked = true;
   };
 
-  private onTouchStart = (e: TouchEvent) => {
-    e.preventDefault();
-    this.virtualTapped = true;
-    const midX = window.innerWidth / 2;
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const t = e.changedTouches[i];
-      if (t.clientX < midX && this.joystickId === null) {
-        this.joystickId = t.identifier;
-        this.joystickOrigin = { x: t.clientX, y: t.clientY };
-      } else if (t.clientX >= midX) {
-        this.virtualFire = true;
-      }
-    }
+  private onMouseUp = () => {
+    this.mouseDown = false;
   };
 
   private onTouchMove = (e: TouchEvent) => {
     e.preventDefault();
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const t = e.changedTouches[i];
-      if (t.identifier === this.joystickId && this.joystickOrigin) {
-        const dx = t.clientX - this.joystickOrigin.x;
-        const dy = t.clientY - this.joystickOrigin.y;
-        const dead = 10;
-        const max = 50;
-        this.virtualDx = Math.abs(dx) > dead ? Math.max(-1, Math.min(1, dx / max)) : 0;
-        this.virtualDy = Math.abs(dy) > dead ? Math.max(-1, Math.min(1, dy / max)) : 0;
-      }
-    }
+    const t = e.touches[0];
+    const { ax, ay } = this.screenToArt(t.clientX, t.clientY);
+    this.mouseX = ax;
+    this.mouseY = ay;
   };
 
-  private onTouchEnd = (e: TouchEvent) => {
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const t = e.changedTouches[i];
-      if (t.identifier === this.joystickId) {
-        this.joystickId = null;
-        this.joystickOrigin = null;
-        this.virtualDx = 0;
-        this.virtualDy = 0;
-      }
-    }
-    // Check remaining touches for fire
-    let rightTouch = false;
-    const midX = window.innerWidth / 2;
-    for (let i = 0; i < e.touches.length; i++) {
-      if (e.touches[i].clientX >= midX) {
-        rightTouch = true;
-        break;
-      }
-    }
-    this.virtualFire = rightTouch;
+  private onTouchStart = (e: TouchEvent) => {
+    e.preventDefault();
+    const t = e.touches[0];
+    const { ax, ay } = this.screenToArt(t.clientX, t.clientY);
+    this.mouseX = ax;
+    this.mouseY = ay;
+    this.mouseDown = true;
+    this._clicked = true;
   };
 
-  constructor() {
-    window.addEventListener('keydown', this.onKeyDown);
-    window.addEventListener('keyup', this.onKeyUp);
-    window.addEventListener('touchstart', this.onTouchStart, { passive: false });
-    window.addEventListener('touchmove', this.onTouchMove, { passive: false });
-    window.addEventListener('touchend', this.onTouchEnd, { passive: false });
+  private onTouchEnd = () => {
+    this.mouseDown = false;
+  };
+
+  private onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'r' || e.key === 'R') this._resetRequested = true;
+  };
+
+  get clicked(): boolean {
+    return this._clicked;
   }
 
-  isDown(code: string): boolean {
-    if (this.held.has(code)) return true;
-    if ((code === 'ArrowLeft' || code === 'KeyA') && this.virtualDx < -0.3) return true;
-    if ((code === 'ArrowRight' || code === 'KeyD') && this.virtualDx > 0.3) return true;
-    if ((code === 'ArrowUp' || code === 'KeyW') && this.virtualDy < -0.3) return true;
-    if ((code === 'ArrowDown' || code === 'KeyS') && this.virtualDy > 0.3) return true;
-    if (code === 'Space' && this.virtualFire) return true;
-    return false;
-  }
-
-  wasPressed(code: string): boolean {
-    if (this.pressed.has(code)) return true;
-    if (code === 'Space' && this.virtualTapped) return true;
-    return false;
+  get resetRequested(): boolean {
+    return this._resetRequested;
   }
 
   clearFrame(): void {
-    this.pressed.clear();
-    this.virtualTapped = false;
+    this._clicked = false;
+    this._resetRequested = false;
   }
 
   destroy(): void {
-    window.removeEventListener('keydown', this.onKeyDown);
-    window.removeEventListener('keyup', this.onKeyUp);
-    window.removeEventListener('touchstart', this.onTouchStart);
+    window.removeEventListener('mousemove', this.onMouseMove);
+    window.removeEventListener('mousedown', this.onMouseDown);
+    window.removeEventListener('mouseup', this.onMouseUp);
     window.removeEventListener('touchmove', this.onTouchMove);
+    window.removeEventListener('touchstart', this.onTouchStart);
     window.removeEventListener('touchend', this.onTouchEnd);
+    window.removeEventListener('keydown', this.onKeyDown);
   }
 }
